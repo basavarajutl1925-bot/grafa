@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import Geolocation from '@react-native-community/geolocation';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import * as Location from 'expo-location';
 
 /**
  * Custom hook for geolocation tracking
@@ -10,71 +9,64 @@ export const useGeolocation = () => {
   const [longitude, setLongitude] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const watchSubscriptionRef = useRef(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const requestLocationPermission = async () => {
       try {
-        if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-            {
-              title: 'Location Permission',
-              message: 'Grafa needs access to your location to show relevant ads',
-              buttonNeutral: 'Ask Me Later',
-              buttonNegative: 'Cancel',
-              buttonPositive: 'OK',
-            }
-          );
+        const { status } = await Location.requestForegroundPermissionsAsync();
 
-          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-            setError('Location permission denied');
-            setIsLoading(false);
-            return;
-          }
+        if (!isMounted) {
+          return;
         }
 
-        // Get current position
-        Geolocation.getCurrentPosition(
+        if (status !== 'granted') {
+          setError('Location permission denied');
+          setIsLoading(false);
+          return;
+        }
+
+        const currentPosition = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setLatitude(currentPosition.coords.latitude);
+        setLongitude(currentPosition.coords.longitude);
+        setIsLoading(false);
+
+        watchSubscriptionRef.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 10000,
+            distanceInterval: 100,
+          },
           position => {
             setLatitude(position.coords.latitude);
             setLongitude(position.coords.longitude);
-            setIsLoading(false);
-
-            // Watch position for continuous updates
-            const watchId = Geolocation.watchPosition(
-              position => {
-                setLatitude(position.coords.latitude);
-                setLongitude(position.coords.longitude);
-              },
-              err => {
-                console.error('Watch position error:', err);
-              },
-              {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 10000,
-              }
-            );
-
-            return () => Geolocation.clearWatch(watchId);
-          },
-          err => {
-            setError(err.message);
-            setIsLoading(false);
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 1000,
           }
         );
       } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+
         setError(err.message);
         setIsLoading(false);
       }
     };
 
     requestLocationPermission();
+
+    return () => {
+      isMounted = false;
+      watchSubscriptionRef.current?.remove?.();
+    };
   }, []);
 
   return { latitude, longitude, error, isLoading };

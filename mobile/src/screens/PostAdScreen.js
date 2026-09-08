@@ -1,19 +1,60 @@
 import React, { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
+  View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { adAPI } from '../services/api';
 import useAuth from '../hooks/useAuth';
+import ScreenHeader from '../components/ScreenHeader';
+import { colors, radii, shadows, spacing } from '../theme';
+
+const InfoChip = ({ icon, label }) => (
+  <View style={styles.infoChip}>
+    <MaterialCommunityIcons name={icon} size={14} color={colors.primary} />
+    <Text style={styles.infoChipText} numberOfLines={1}>
+      {label}
+    </Text>
+  </View>
+);
+
+const Field = ({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = false,
+  keyboardType = 'default',
+  autoCapitalize = 'sentences',
+  returnKeyType = 'next',
+}) => (
+  <View style={styles.field}>
+    <Text style={styles.label}>{label}</Text>
+    <TextInput
+      style={[styles.input, multiline && styles.textArea]}
+      placeholder={placeholder}
+      placeholderTextColor={colors.textMuted}
+      value={value}
+      onChangeText={onChangeText}
+      multiline={multiline}
+      numberOfLines={multiline ? 4 : 1}
+      keyboardType={keyboardType}
+      autoCapitalize={autoCapitalize}
+      returnKeyType={returnKeyType}
+    />
+  </View>
+);
 
 const PostAdScreen = ({ navigation }) => {
-  const { district, user } = useAuth();
+  const { district } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -24,16 +65,27 @@ const PostAdScreen = ({ navigation }) => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const hasDistrict = Boolean(district);
+  const districtLabel = district || 'Detecting your district';
+
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
 
   const handleSubmit = async () => {
+    if (!hasDistrict) {
+      Alert.alert(
+        'Location required',
+        'We need your district before posting an ad so it reaches the right audience.'
+      );
+      return;
+    }
+
     if (!formData.title || !formData.shopLocation) {
-      Alert.alert('Error', 'Title and shop location are required');
+      Alert.alert('Missing details', 'Title and shop location are required.');
       return;
     }
 
@@ -49,7 +101,7 @@ const PostAdScreen = ({ navigation }) => {
         formData.contactEmail
       );
 
-      Alert.alert('Success', 'Ad request submitted for approval');
+      Alert.alert('Success', 'Ad request submitted for approval.');
       setFormData({
         title: '',
         description: '',
@@ -58,167 +110,326 @@ const PostAdScreen = ({ navigation }) => {
         contactPhone: '',
         contactEmail: '',
       });
-      navigation.goBack();
+
+      if (navigation?.canGoBack?.()) {
+        navigation.goBack();
+      }
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(
+        'Submission failed',
+        error?.response?.data?.error || error.message || 'Unable to submit ad'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Post an Ad</Text>
-        <Text style={styles.headerSubtitle}>District: {district}</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <ScreenHeader
+          eyebrow="Promote your shop"
+          title="Post a district ad"
+          subtitle="Create a clean, local-first ad that gets reviewed before it goes live."
+          icon="plus-circle-outline"
+          accent={colors.accent}
+          badge={hasDistrict ? district : 'Detecting'}
+        />
 
-      <View style={styles.form}>
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Title *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ad title"
+        <View style={styles.previewCard}>
+          <Text style={styles.sectionLabel}>Live preview</Text>
+          <View style={styles.previewRow}>
+            <View style={styles.previewIcon}>
+              <MaterialCommunityIcons
+                name="storefront-outline"
+                size={24}
+                color={colors.accent}
+              />
+            </View>
+            <View style={styles.previewCopy}>
+              <Text style={styles.previewTitle} numberOfLines={2}>
+                {formData.title || 'Your ad title will appear here'}
+              </Text>
+              <Text style={styles.previewDescription} numberOfLines={2}>
+                {formData.description ||
+                  'Add a short description to make the offer easy to understand.'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.previewMetaRow}>
+            <InfoChip icon="map-marker-outline" label={districtLabel} />
+            <InfoChip icon="shield-check-outline" label="Requires approval" />
+          </View>
+        </View>
+
+        <View style={styles.formCard}>
+          <Text style={styles.sectionLabel}>Ad details</Text>
+          <Field
+            label="Title"
+            placeholder="Fresh vegetables from today"
             value={formData.title}
-            onChangeText={text => handleInputChange('title', text)}
-            editable={!isLoading}
+            onChangeText={(text) => handleInputChange('title', text)}
+            returnKeyType="next"
           />
-        </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Describe your ad"
+          <Field
+            label="Description"
+            placeholder="Tell people what you are selling or offering"
             value={formData.description}
-            onChangeText={text => handleInputChange('description', text)}
+            onChangeText={(text) => handleInputChange('description', text)}
             multiline
-            numberOfLines={4}
-            editable={!isLoading}
           />
-        </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Category</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g., Retail, Service, Food"
+          <Field
+            label="Category"
+            placeholder="Retail, Service, Food, Tools..."
             value={formData.category}
-            onChangeText={text => handleInputChange('category', text)}
-            editable={!isLoading}
+            onChangeText={(text) => handleInputChange('category', text)}
           />
-        </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Shop Location *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Shop address or location details"
+          <Field
+            label="Shop location"
+            placeholder="Main market, road name, landmark..."
             value={formData.shopLocation}
-            onChangeText={text => handleInputChange('shopLocation', text)}
-            editable={!isLoading}
+            onChangeText={(text) => handleInputChange('shopLocation', text)}
           />
+
+          <View style={styles.inlineFields}>
+            <View style={styles.inlineField}>
+              <Field
+                label="Contact phone"
+                placeholder="Phone number"
+                value={formData.contactPhone}
+                onChangeText={(text) => handleInputChange('contactPhone', text)}
+                keyboardType="phone-pad"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.inlineField}>
+              <Field
+                label="Contact email"
+                placeholder="Email address"
+                value={formData.contactEmail}
+                onChangeText={(text) => handleInputChange('contactEmail', text)}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Contact Phone</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Phone number"
-            value={formData.contactPhone}
-            onChangeText={text => handleInputChange('contactPhone', text)}
-            keyboardType="phone-pad"
-            editable={!isLoading}
+        <View style={styles.tipCard}>
+          <MaterialCommunityIcons
+            name="sparkles"
+            size={18}
+            color={colors.accent}
           />
+          <Text style={styles.tipText}>
+            Keep the title short, lead with the offer, and make the shop
+            location specific.
+          </Text>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Contact Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Email address"
-            value={formData.contactEmail}
-            onChangeText={text => handleInputChange('contactEmail', text)}
-            keyboardType="email-address"
-            editable={!isLoading}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+        <Pressable
+          style={({ pressed }) => [
+            styles.submitButton,
+            (!hasDistrict || isLoading) && styles.submitButtonDisabled,
+            pressed && !(!hasDistrict || isLoading) && styles.submitButtonPressed,
+          ]}
           onPress={handleSubmit}
-          disabled={isLoading}
+          disabled={!hasDistrict || isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={colors.surface} />
           ) : (
-            <Text style={styles.submitButtonText}>Submit for Approval</Text>
+            <Text style={styles.submitButtonText}>Submit for approval</Text>
           )}
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </Pressable>
+
+        {!hasDistrict ? (
+          <Text style={styles.helperText}>
+            Location is still loading. We will enable publishing as soon as we
+            know your district.
+          </Text>
+        ) : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.background,
   },
-  header: {
-    backgroundColor: '#007AFF',
-    padding: 20,
-    paddingTop: 10,
+  content: {
+    paddingBottom: spacing.xxl,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+  previewCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#e0e0e0',
-    marginTop: 5,
+  formCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
-  form: {
-    padding: 15,
+  sectionLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: spacing.md,
   },
-  formGroup: {
-    marginBottom: 20,
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  previewIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accentSoft,
+  },
+  previewCopy: {
+    flex: 1,
+  },
+  previewTitle: {
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
+  },
+  previewDescription: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: spacing.xs,
+  },
+  previewMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  infoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  infoChipText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '700',
+    maxWidth: 180,
+  },
+  field: {
+    marginBottom: spacing.lg,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: spacing.sm,
   },
   input: {
+    backgroundColor: colors.backgroundSoft,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#fff',
+    borderColor: colors.border,
+    color: colors.text,
     fontSize: 14,
   },
   textArea: {
-    height: 100,
+    minHeight: 110,
     textAlignVertical: 'top',
   },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 14,
-    borderRadius: 8,
+  inlineFields: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  inlineField: {
+    flex: 1,
+  },
+  tipCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    backgroundColor: '#FFF5E9',
+    borderRadius: radii.lg,
+    padding: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#F6D6A7',
+  },
+  tipText: {
+    flex: 1,
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  submitButton: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    backgroundColor: colors.accent,
+    borderRadius: radii.pill,
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
+  },
+  submitButtonPressed: {
+    opacity: 0.96,
+    transform: [{ scale: 0.99 }],
   },
   submitButtonDisabled: {
     opacity: 0.6,
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  helperText: {
+    marginTop: spacing.md,
+    marginHorizontal: spacing.xl,
+    color: colors.textSoft,
+    textAlign: 'center',
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
 

@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useGeolocation } from './useGeolocation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI, locationAPI } from '../services/api';
-import DeviceInfo from 'react-native-device-info';
 import uuid from 'react-native-uuid';
 
 /**
@@ -13,8 +12,14 @@ export const useAuth = () => {
   const [district, setDistrict] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { latitude, longitude } = useGeolocation();
+  const {
+    latitude,
+    longitude,
+    error: locationError,
+    isLoading: locationLoading,
+  } = useGeolocation();
   const deviceIdRef = useRef(null);
+  const hasLoggedInRef = useRef(false);
 
   // Initialize device ID
   useEffect(() => {
@@ -26,6 +31,11 @@ export const useAuth = () => {
           await AsyncStorage.setItem('deviceId', deviceId);
         }
         deviceIdRef.current = deviceId;
+
+        const cachedDistrict = await AsyncStorage.getItem('userDistrict');
+        if (cachedDistrict) {
+          setDistrict(cachedDistrict);
+        }
       } catch (err) {
         console.error('Error initializing device ID:', err);
       }
@@ -34,10 +44,22 @@ export const useAuth = () => {
     initDeviceId();
   }, []);
 
+  useEffect(() => {
+    if (locationError) {
+      setError(locationError);
+    }
+
+    if (!locationLoading && (!latitude || !longitude) && !hasLoggedInRef.current) {
+      setIsLoading(false);
+    }
+  }, [latitude, longitude, locationError, locationLoading]);
+
   // Login user with location
   useEffect(() => {
     const loginUser = async () => {
-      if (!latitude || !longitude || !deviceIdRef.current) return;
+      if (!latitude || !longitude || !deviceIdRef.current || hasLoggedInRef.current) {
+        return;
+      }
 
       try {
         setIsLoading(true);
@@ -53,10 +75,20 @@ export const useAuth = () => {
 
         // Get district
         const districtResponse = await locationAPI.getDistrict(latitude, longitude);
-        setDistrict(districtResponse.data.district);
-        await AsyncStorage.setItem('userDistrict', districtResponse.data.district);
+        const resolvedDistrict =
+          districtResponse.data.district ||
+          response.data.user?.district ||
+          'Your district';
+        setDistrict(resolvedDistrict);
+        await AsyncStorage.setItem('userDistrict', resolvedDistrict);
+        setError(null);
+        hasLoggedInRef.current = true;
       } catch (err) {
         console.error('Login error:', err);
+        const cachedDistrict = await AsyncStorage.getItem('userDistrict');
+        if (cachedDistrict) {
+          setDistrict(cachedDistrict);
+        }
         setError(err.message);
       } finally {
         setIsLoading(false);
@@ -72,6 +104,8 @@ export const useAuth = () => {
       await AsyncStorage.removeItem('userId');
       setUser(null);
       setDistrict(null);
+      setError(null);
+      hasLoggedInRef.current = false;
     } catch (err) {
       console.error('Logout error:', err);
     }

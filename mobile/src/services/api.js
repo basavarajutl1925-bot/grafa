@@ -1,7 +1,12 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = 'http://localhost:5000/api'; // Change for production
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl ||
+  Constants.manifest?.extra?.apiUrl ||
+  'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -114,4 +119,5 @@ export const adminAPI = {
     api.get('/admin/dashboard/stats'),
 };
 
+export { api };
 export default api;

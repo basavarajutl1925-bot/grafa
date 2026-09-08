@@ -283,10 +283,11 @@ router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => 
     ]);
 
     const totalAlerts = await PriceAlert.countDocuments();
-    const totalUsers = await PriceAlert.distinctCount Users();
+    const totalUsers = (await PriceAlert.distinct('userId')).length;
 
     res.json({
       totalAlerts,
+      totalUsers,
       alertsByType: stats,
     });
   } catch (error) {
