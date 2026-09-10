@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GRAFA Super Admin</title>
+  <style>
+    :root { color-scheme: light; font-family: Georgia, 'Times New Roman', serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; color: #18352b; background: radial-gradient(circle at top left, #dbeed0, transparent 42%), #f5f0e7; }
+    main { width: min(92vw, 430px); padding: 38px; border: 1px solid #d4dccd; border-radius: 28px; background: rgba(255,255,255,.86); box-shadow: 0 24px 70px rgba(31,59,43,.16); }
+    .mark { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; color: #fff; background: #1f6b4b; font-size: 25px; }
+    h1 { margin: 24px 0 8px; font-size: 32px; }
+    p { color: #66766d; line-height: 1.5; }
+    label { display: block; margin: 22px 0 7px; font: 700 12px Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #587064; }
+    input { width: 100%; padding: 15px 16px; border: 1px solid #cbd8cd; border-radius: 13px; font-size: 16px; outline: none; }
+    input:focus { border-color: #1f6b4b; box-shadow: 0 0 0 4px rgba(31,107,75,.12); }
+    button { width: 100%; margin-top: 26px; padding: 16px; border: 0; border-radius: 13px; color: #fff; background: #1f6b4b; font: 700 15px Arial, sans-serif; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: wait; }
+    #message { min-height: 22px; margin-top: 16px; color: #a54435; font: 14px Arial, sans-serif; }
+    .note { margin-top: 24px; font: 12px Arial, sans-serif; color: #809087; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark">G</div>
+    <h1>Super Admin</h1>
+    <p>Sign in to manage ads, crops, market items, and platform data.</p>
+    <form id="login-form">
+      <label for="email">Admin email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button id="submit" type="submit">Sign in securely</button>
+      <div id="message" role="alert"></div>
+    </form>
+    <div class="note">GRAFA administration portal</div>
+  </main>
+  <script>
+    const apiUrl = 'http://54.37.224.29:5012/api';
+    const form = document.getElementById('login-form');
+    const submit = document.getElementById('submit');
+    const message = document.getElementById('message');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      submit.disabled = true;
+      message.textContent = '';
+      try {
+        const response = await fetch(`${apiUrl}/auth/admin/login`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.token) throw new Error(data.error || 'Unable to sign in');
+        localStorage.setItem('grafaAdminToken', data.token);
+        localStorage.setItem('grafaAdminUser', JSON.stringify(data.user || {}));
+        window.location.href = '/dashboard.html';
+      } catch (error) {
+        message.textContent = error.message;
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
