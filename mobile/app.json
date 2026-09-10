@@ -44,7 +44,7 @@
       ]
     ],
     "extra": {
-      "apiUrl": "http://localhost:5000/api",
+      "apiUrl": "http://54.37.224.29:5012/api",
       "eas": {
         "projectId": "00000000-0000-0000-0000-000000000000"
       }
